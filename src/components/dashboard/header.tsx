@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { LanguageToggle } from "@/components/language-toggle";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 interface DashboardHeaderProps {
   userName: string;
@@ -33,6 +34,13 @@ const NOTIFICATIONS = [
 
 export function DashboardHeader({ userName, userEmail, avatarUrl, mobileNav }: DashboardHeaderProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    window.location.href = "/entrar";
+  };
+
   const initials = userName
     .split(" ")
     .map((p) => p[0])
@@ -121,12 +129,10 @@ export function DashboardHeader({ userName, userEmail, avatarUrl, mobileNav }: D
             <DropdownMenuSeparator />
             <DropdownMenuItem
               variant="destructive"
-              render={
-                <Link href="/entrar">
-                  <LogOut className="h-4 w-4" /> Terminar sessão
-                </Link>
-              }
-            />
+              onClick={handleLogout}
+            >
+              <LogOut className="h-4 w-4" /> Terminar sessão
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>

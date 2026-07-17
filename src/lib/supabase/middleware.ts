@@ -49,7 +49,15 @@ export async function updateSession(request: NextRequest) {
 
   if (user && isAdminRoute) {
     const role = (user.app_metadata?.role as string | undefined) ?? "client";
-    if (role !== "admin" && role !== "super_admin") {
+    const email = user.email || "";
+    const isAdminEmail = [
+      "multmakerst@gmail.com",
+      "isildotavares@gmail.com",
+      "isildo@gmail.com",
+      "admin@fluxo.pt"
+    ].includes(email.toLowerCase());
+
+    if (role !== "admin" && role !== "super_admin" && !isAdminEmail) {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
       return NextResponse.redirect(url);

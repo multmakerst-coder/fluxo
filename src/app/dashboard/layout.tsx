@@ -1,10 +1,28 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/header";
+import { createClient } from "@/lib/supabase/client";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const user = { name: "Marta Silva", email: "marta@negocio.pt" };
+  const [user, setUser] = useState<{ name: string; email: string; avatarUrl?: string }>({
+    name: "Utilizador",
+    email: "",
+  });
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user: supabaseUser } }) => {
+      if (supabaseUser) {
+        setUser({
+          name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || supabaseUser.email?.split("@")[0] || "Utilizador",
+          email: supabaseUser.email || "",
+          avatarUrl: supabaseUser.user_metadata?.avatar_url,
+        });
+      }
+    });
+  }, []);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -15,6 +33,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <DashboardHeader
           userName={user.name}
           userEmail={user.email}
+          avatarUrl={user.avatarUrl}
           mobileNav={(close) => <DashboardSidebar onNavigate={close} />}
         />
         <main className="flex-1 overflow-y-auto">

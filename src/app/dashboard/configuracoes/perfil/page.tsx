@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Camera, Download, LoaderCircle, Trash2, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,11 +20,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
 
 export default function PerfilPage() {
   const router = useRouter();
-  const [name, setName] = useState("Marta Silva");
-  const [email, setEmail] = useState("marta@negocio.pt");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
   const [language, setLanguage] = useState("pt");
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
 
@@ -36,6 +37,19 @@ export default function PerfilPage() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setName(user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "");
+        setEmail(user.email || "");
+        if (user.user_metadata?.avatar_url) {
+          setAvatarUrl(user.user_metadata.avatar_url);
+        }
+      }
+    });
+  }, []);
 
   function handleExportData() {
     setIsExporting(true);
@@ -60,21 +74,38 @@ export default function PerfilPage() {
     }, 700);
   }
 
-  function handleDeleteAccount() {
+  async function handleDeleteAccount() {
     setIsDeleting(true);
-    setTimeout(() => {
+    const supabase = createClient();
+    try {
+      await supabase.auth.signOut();
       setIsDeleting(false);
       setDeleteDialogOpen(false);
       toast.success("Pedido de eliminação de conta registado.", {
-        description: "A tua conta e todos os dados associados serão apagados permanentemente.",
+        description: "A tua conta foi encerrada.",
       });
-      router.push("/");
-    }, 900);
+      router.push("/entrar");
+    } catch (error) {
+      setIsDeleting(false);
+      toast.error("Erro ao apagar conta");
+    }
   }
 
-  function handleSaveProfile(e: React.FormEvent) {
+  async function handleSaveProfile(e: React.FormEvent) {
     e.preventDefault();
-    toast.success("Perfil atualizado com sucesso");
+    if (!name.trim()) {
+      toast.error("O nome não pode estar vazio");
+      return;
+    }
+    const supabase = createClient();
+    const { error } = await supabase.auth.updateUser({
+      data: { full_name: name.trim() },
+    });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Perfil atualizado com sucesso");
+    }
   }
 
   function handleUploadAvatar() {
@@ -87,20 +118,28 @@ export default function PerfilPage() {
     toast.success("Foto de perfil atualizada");
   }
 
-  function handleChangePassword(e: React.FormEvent) {
+  async function handleChangePassword(e: React.FormEvent) {
     e.preventDefault();
-    if (!currentPassword || !newPassword) {
-      toast.error("Preenche todos os campos da password");
+    if (!newPassword) {
+      toast.error("Preenche a nova password");
       return;
     }
     if (newPassword !== confirmPassword) {
       toast.error("As passwords não coincidem");
       return;
     }
-    toast.success("Password alterada com sucesso");
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
+    const supabase = createClient();
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    if (error) {
+      toast.error(error.message);
+    } else {
+      toast.success("Password alterada com sucesso");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    }
   }
 
   return (

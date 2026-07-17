@@ -1,10 +1,28 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { AdminSidebar } from "@/components/admin/sidebar";
 import { DashboardHeader } from "@/components/dashboard/header";
+import { createClient } from "@/lib/supabase/client";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  const admin = { name: "Admin Fluxo", email: "admin@fluxo.pt" };
+  const [admin, setAdmin] = useState<{ name: string; email: string; avatarUrl?: string }>({
+    name: "Administrador",
+    email: "",
+  });
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setAdmin({
+          name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "Administrador",
+          email: user.email || "",
+          avatarUrl: user.user_metadata?.avatar_url,
+        });
+      }
+    });
+  }, []);
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -15,6 +33,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         <DashboardHeader
           userName={admin.name}
           userEmail={admin.email}
+          avatarUrl={admin.avatarUrl}
           mobileNav={(close) => <AdminSidebar onNavigate={close} />}
         />
         <main className="flex-1 overflow-y-auto">
