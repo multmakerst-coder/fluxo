@@ -43,7 +43,12 @@ export async function signUpWithGoogleAction() {
   try {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
-      options: { redirectTo: new URL("/auth/callback?redirect=/onboarding", appUrl).toString() },
+      options: {
+        redirectTo: new URL("/auth/callback?redirect=/onboarding", appUrl).toString(),
+        queryParams: {
+          prompt: "select_account",
+        },
+      },
     });
 
     if (error) {
