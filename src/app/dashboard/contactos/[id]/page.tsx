@@ -32,7 +32,7 @@ export default async function ContactProfilePage({ params }: { params: Promise<{
     channel: contact.source_channel || "whatsapp",
     createdAt: contact.created_at,
     lastContactAt: contact.last_contact_at || contact.created_at,
-    tags: contact.contact_tags?.map((ct: any) => ct.tag_id) || [],
+    tags: contact.contact_tags?.map((ct: { tag_id: string }) => ct.tag_id) || [],
     status: "ativo" as const,
     customFields: [],
     notes: [],

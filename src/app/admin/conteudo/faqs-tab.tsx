@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { toastSaved } from "@/lib/toast";
 import { FAQS, type Faq } from "./_data";
 
 const emptyForm = { question: "", answer: "", category: "" };
@@ -43,7 +44,7 @@ export function FaqsTab() {
     if (!form.question.trim() || !form.answer.trim()) return;
     if (editingId) {
       setFaqs((prev) => prev.map((f) => (f.id === editingId ? { ...f, ...form } : f)));
-      toast.success("Pergunta frequente atualizada");
+      toastSaved("Pergunta frequente atualizada");
     } else {
       const newFaq: Faq = { id: `faq-${Date.now()}`, ...form, category: form.category || "Geral" };
       setFaqs((prev) => [newFaq, ...prev]);

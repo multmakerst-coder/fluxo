@@ -55,34 +55,100 @@ export default function AdminClientesPage() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase
-      .from("profiles")
-      .select("*")
-      .eq("role", "client")
-      .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (data) {
-          const mapped = data.map((profile) => ({
-            id: profile.id,
-            name: profile.full_name || "Cliente Sem Nome",
-            contactName: profile.full_name || "Cliente Sem Nome",
-            email: profile.email || "",
-            plan: "gratuito" as PlanSlug,
-            status: "ativo" as ClientStatus,
-            registeredAt: profile.created_at,
-            channels: [] as Channel[],
-            contactsCount: 0,
-            messagesSent: 0,
-            messagesReceived: 0,
-            activeFlows: 0,
-            lastActivity: profile.created_at,
-            mrr: 0,
-            planHistory: [],
-          }));
-          setClients(mapped);
-        }
+
+    (async () => {
+      // Apenas perfis "raiz" de clientes (sem owner_id — ou seja, não são membros de
+      // equipa/agentes de outro cliente) contam como um cliente da plataforma.
+      const { data: profiles, error } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("role", "client")
+        .is("owner_id", null)
+        .order("created_at", { ascending: false });
+
+      if (error || !profiles || profiles.length === 0) {
+        setClients([]);
         setLoading(false);
+        return;
+      }
+
+      const clientIds = profiles.map((p) => p.id);
+
+      const [subscriptionsRes, channelsRes, contactsRes, flowsRes] = await Promise.all([
+        supabase
+          .from("subscriptions")
+          .select("client_id, status, current_period_end, created_at, plan:plans(slug, price_monthly)")
+          .in("client_id", clientIds)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("channels")
+          .select("client_id, type")
+          .in("client_id", clientIds)
+          .eq("status", "connected"),
+        supabase.from("contacts").select("client_id").in("client_id", clientIds),
+        supabase.from("flows").select("client_id, status").in("client_id", clientIds),
+      ]);
+
+      // Uma subscrição por cliente (a mais recente, devido ao order acima)
+      const subscriptionByClient = new Map<string, NonNullable<typeof subscriptionsRes.data>[number]>();
+      for (const sub of subscriptionsRes.data ?? []) {
+        if (!subscriptionByClient.has(sub.client_id)) subscriptionByClient.set(sub.client_id, sub);
+      }
+
+      const channelsByClient = new Map<string, Channel[]>();
+      for (const ch of channelsRes.data ?? []) {
+        const list = channelsByClient.get(ch.client_id) ?? [];
+        list.push(ch.type as Channel);
+        channelsByClient.set(ch.client_id, list);
+      }
+
+      const contactsCountByClient = new Map<string, number>();
+      for (const c of contactsRes.data ?? []) {
+        contactsCountByClient.set(c.client_id, (contactsCountByClient.get(c.client_id) ?? 0) + 1);
+      }
+
+      const activeFlowsByClient = new Map<string, number>();
+      for (const f of flowsRes.data ?? []) {
+        if (f.status !== "active") continue;
+        activeFlowsByClient.set(f.client_id, (activeFlowsByClient.get(f.client_id) ?? 0) + 1);
+      }
+
+      const statusMap: Record<string, ClientStatus> = {
+        trialing: "trial",
+        active: "ativo",
+        past_due: "suspenso",
+        canceled: "cancelado",
+      };
+
+      const mapped = profiles.map((profile) => {
+        const subscription = subscriptionByClient.get(profile.id);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const plan = subscription?.plan as any;
+        const planSlug = (plan?.slug as PlanSlug) ?? "gratuito";
+        const status = subscription ? (statusMap[subscription.status] ?? "trial") : "trial";
+
+        return {
+          id: profile.id,
+          name: profile.full_name || "Cliente Sem Nome",
+          contactName: profile.full_name || "Cliente Sem Nome",
+          email: profile.email || "",
+          plan: planSlug,
+          status,
+          registeredAt: profile.created_at,
+          channels: channelsByClient.get(profile.id) ?? [],
+          contactsCount: contactsCountByClient.get(profile.id) ?? 0,
+          messagesSent: 0,
+          messagesReceived: 0,
+          activeFlows: activeFlowsByClient.get(profile.id) ?? 0,
+          lastActivity: profile.updated_at || profile.created_at,
+          mrr: status === "ativo" ? Number(plan?.price_monthly ?? 0) : 0,
+          planHistory: [],
+        };
       });
+
+      setClients(mapped);
+      setLoading(false);
+    })();
   }, []);
 
   const filtered = useMemo(() => {

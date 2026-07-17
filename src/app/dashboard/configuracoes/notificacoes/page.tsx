@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
-import { toast } from "sonner";
+import { toastSaved } from "@/lib/toast";
 
 interface NotificationSetting {
   id: string;
@@ -39,7 +39,7 @@ export default function NotificacoesPage() {
       prev.map((s) => {
         if (s.id !== id) return s;
         const next = !s.enabled;
-        toast.success(next ? `"${s.title}" ativada` : `"${s.title}" desativada`);
+        toastSaved(next ? `"${s.title}" ativada` : `"${s.title}" desativada`);
         return { ...s, enabled: next };
       }),
     );

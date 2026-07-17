@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isAdminEmail, isAdminRole } from "@/lib/admin";
 
 const CLIENT_PREFIX = "/dashboard";
 const ADMIN_PREFIX = "/admin";
@@ -47,26 +48,25 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  const email = user?.email || "";
-  const isAdminEmail = [
-    "multmakerst@gmail.com",
-    "isildotavares@gmail.com",
-    "isildo@gmail.com",
-    "isildotavaresst@gmail.com",
-    "isildotavarespt@gmail.com",
-    "admin@fluxo.pt"
-  ].includes(email.toLowerCase());
-
-  if (user && isAdminRoute) {
-    const role = (user.app_metadata?.role as string | undefined) ?? "client";
-    if (role !== "admin" && role !== "super_admin" && !isAdminEmail) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/dashboard";
-      return NextResponse.redirect(url);
-    }
+  // profiles.role na base de dados é a fonte de verdade para quem é admin.
+  // ADMIN_EMAIL é apenas um "bootstrap" de segurança (ver src/lib/admin.ts).
+  let isAdmin = false;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+    isAdmin = isAdminRole(profile?.role) || isAdminEmail(user.email);
   }
 
-  if (user && isClientRoute && isAdminEmail) {
+  if (user && isAdminRoute && !isAdmin) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dashboard";
+    return NextResponse.redirect(url);
+  }
+
+  if (user && isClientRoute && isAdmin) {
     const url = request.nextUrl.clone();
     url.pathname = "/admin";
     return NextResponse.redirect(url);
@@ -74,7 +74,7 @@ export async function updateSession(request: NextRequest) {
 
   if (user && isAuthPage) {
     const url = request.nextUrl.clone();
-    url.pathname = isAdminEmail ? "/admin" : "/dashboard";
+    url.pathname = isAdmin ? "/admin" : "/dashboard";
     url.search = "";
     return NextResponse.redirect(url);
   }

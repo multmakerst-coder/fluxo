@@ -20,6 +20,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { toastSaved } from "@/lib/toast";
 import { createClient } from "@/lib/supabase/client";
 
 export default function PerfilPage() {
@@ -85,7 +86,7 @@ export default function PerfilPage() {
         description: "A tua conta foi encerrada.",
       });
       router.push("/entrar");
-    } catch (error) {
+    } catch {
       setIsDeleting(false);
       toast.error("Erro ao apagar conta");
     }
@@ -104,7 +105,7 @@ export default function PerfilPage() {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success("Perfil atualizado com sucesso");
+      toastSaved("Perfil atualizado com sucesso");
     }
   }
 
@@ -115,7 +116,7 @@ export default function PerfilPage() {
       "https://i.pravatar.cc/150?img=12",
     ];
     setAvatarUrl(mockAvatars[Math.floor(Math.random() * mockAvatars.length)]);
-    toast.success("Foto de perfil atualizada");
+    toastSaved("Foto de perfil atualizada");
   }
 
   async function handleChangePassword(e: React.FormEvent) {
@@ -135,7 +136,7 @@ export default function PerfilPage() {
     if (error) {
       toast.error(error.message);
     } else {
-      toast.success("Password alterada com sucesso");
+      toastSaved("Password alterada com sucesso");
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");

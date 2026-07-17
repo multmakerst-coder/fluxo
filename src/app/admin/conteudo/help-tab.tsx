@@ -19,6 +19,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { toastSaved } from "@/lib/toast";
 import { HELP_ARTICLES, HELP_CATEGORIES, type HelpArticle } from "./_data";
 
 function formatDate(iso: string) {
@@ -49,7 +50,7 @@ export function HelpTab() {
     if (!form.title.trim()) return;
     if (editingId) {
       setArticles((prev) => prev.map((a) => (a.id === editingId ? { ...a, ...form, updatedAt: new Date().toISOString() } : a)));
-      toast.success("Artigo de ajuda atualizado");
+      toastSaved("Artigo de ajuda atualizado");
     } else {
       const newArticle: HelpArticle = { id: `help-${Date.now()}`, ...form, updatedAt: new Date().toISOString() };
       setArticles((prev) => [newArticle, ...prev]);

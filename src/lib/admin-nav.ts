@@ -8,6 +8,7 @@ import {
   FileText,
   Tag,
   Megaphone,
+  Settings,
 } from "lucide-react";
 
 export interface AdminNavItem {
@@ -25,4 +26,5 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { label: "Conteúdo", href: "/admin/conteudo", icon: FileText },
   { label: "Planos", href: "/admin/planos", icon: Tag },
   { label: "Notificações", href: "/admin/notificacoes", icon: Megaphone },
+  { label: "Configurações", href: "/admin/configuracoes", icon: Settings },
 ];

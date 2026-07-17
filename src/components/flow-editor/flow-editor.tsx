@@ -17,6 +17,7 @@ import ReactFlow, {
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { toast } from "sonner";
+import { toastSaved } from "@/lib/toast";
 import {
   ArrowLeft,
   Save,
@@ -278,7 +279,7 @@ export function FlowEditor({ flowId, channel }: { flowId: string; channel: Chann
         const body = await response.json().catch(() => null);
         throw new Error(body?.error ?? "Erro ao guardar fluxo");
       }
-      toast.success("Fluxo guardado", { description: `"${flowName}" foi guardado com sucesso.` });
+      toastSaved("Fluxo guardado", `"${flowName}" foi guardado com sucesso.`);
     } catch (error) {
       toast.error("Não foi possível guardar o fluxo", {
         description: error instanceof Error ? error.message : "Erro desconhecido",

@@ -14,6 +14,21 @@ const sendSchema = z
     message: "É necessário indicar conversationId ou contactId",
   });
 
+async function resolveClientId(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, owner_id")
+    .eq("id", user.id)
+    .single();
+
+  return profile?.owner_id ?? profile?.id ?? user.id;
+}
+
 export async function POST(request: NextRequest) {
   let body: unknown;
   try {
@@ -39,19 +54,40 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Serviço indisponível" }, { status: 503 });
   }
 
+  const clientId = await resolveClientId(supabase);
+  if (!clientId) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  }
+
   try {
     // resolve a conversa (usa a existente ou cria uma nova a partir do contactId)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let conversation: any;
 
     if (conversationId) {
-      const { data } = await supabase.from("conversations").select("*").eq("id", conversationId).single();
+      const { data } = await supabase
+        .from("conversations")
+        .select("*")
+        .eq("id", conversationId)
+        .eq("client_id", clientId)
+        .single();
       conversation = data;
     } else if (contactId) {
+      const { data: contact } = await supabase
+        .from("contacts")
+        .select("client_id")
+        .eq("id", contactId)
+        .eq("client_id", clientId)
+        .single();
+      if (!contact) {
+        return NextResponse.json({ error: "Contacto não encontrado" }, { status: 404 });
+      }
+
       const { data: existing } = await supabase
         .from("conversations")
         .select("*")
         .eq("contact_id", contactId)
+        .eq("client_id", clientId)
         .eq("channel", channel)
         .eq("status", "open")
         .maybeSingle();
@@ -59,10 +95,6 @@ export async function POST(request: NextRequest) {
       if (existing) {
         conversation = existing;
       } else {
-        const { data: contact } = await supabase.from("contacts").select("client_id").eq("id", contactId).single();
-        if (!contact) {
-          return NextResponse.json({ error: "Contacto não encontrado" }, { status: 404 });
-        }
         const { data: created } = await supabase
           .from("conversations")
           .insert({

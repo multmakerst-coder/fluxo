@@ -17,6 +17,7 @@ import {
   Send,
 } from "lucide-react";
 import { toast } from "sonner";
+import { toastSaved } from "@/lib/toast";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -223,7 +224,7 @@ export function EmailEditorDialog() {
           </Button>
           <Button
             onClick={() => {
-              toast.success("Email guardado.");
+              toastSaved("Email guardado.");
               setOpen(false);
             }}
           >

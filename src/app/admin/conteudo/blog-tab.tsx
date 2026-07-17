@@ -19,6 +19,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { toastSaved } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { BLOG_POSTS, BLOG_CATEGORIES, type BlogPost } from "./_data";
 
@@ -50,7 +51,7 @@ export function BlogTab() {
     if (!form.title.trim()) return;
     if (editingId) {
       setPosts((prev) => prev.map((p) => (p.id === editingId ? { ...p, ...form } : p)));
-      toast.success("Artigo atualizado");
+      toastSaved("Artigo atualizado");
     } else {
       const newPost: BlogPost = {
         id: `post-${Date.now()}`,

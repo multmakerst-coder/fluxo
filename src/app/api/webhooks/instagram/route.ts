@@ -95,6 +95,12 @@ async function processInstagramPayload(payload: InstagramWebhookPayload) {
   }
 
   for (const entry of payload.entry ?? []) {
+    // `entry.id` é o ID da conta profissional do Instagram que recebeu o evento
+    // (equivalente ao `phone_number_id` no webhook do WhatsApp) — é a única forma
+    // de saber a qual workspace/cliente este evento pertence quando há múltiplas
+    // contas de Instagram ligadas na plataforma.
+    const receivingAccountId = entry.id;
+
     // DMs
     for (const event of entry.messaging ?? []) {
       if (!event.message?.text) continue;
@@ -104,6 +110,7 @@ async function processInstagramPayload(payload: InstagramWebhookPayload) {
           content: event.message.text,
           externalMessageId: event.message.mid,
           kind: "dm",
+          receivingAccountId,
         });
       } catch (error) {
         console.error("Erro ao gravar DM do Instagram:", error);
@@ -122,6 +129,7 @@ async function processInstagramPayload(payload: InstagramWebhookPayload) {
           externalMessageId: value.id,
           contactUsername: value.from.username,
           kind: "comment",
+          receivingAccountId,
         });
       } catch (error) {
         console.error("Erro ao gravar comentário/menção do Instagram:", error);
@@ -138,9 +146,10 @@ async function handleInboundEvent(
     externalMessageId: string;
     contactUsername?: string;
     kind: "dm" | "comment";
+    receivingAccountId: string;
   },
 ) {
-  const { externalContactId, content, contactUsername, kind } = params;
+  const { externalContactId, content, contactUsername, kind, receivingAccountId } = params;
 
   // Instagram não fornece número de telefone; usa-se o ID externo do IG como
   // referência única do contacto (guardado em `notes` por falta de coluna dedicada
@@ -155,10 +164,14 @@ async function handleInboundEvent(
   let clientId: string | undefined = existingContact?.client_id;
 
   if (!contactId) {
+    // resolve o workspace (client_id) a partir do canal ligado com esta conta de
+    // Instagram — sem este filtro, com múltiplos clientes a usar Instagram, o
+    // primeiro canal encontrado "roubaria" as mensagens de todos os outros.
     const { data: channel } = await supabase
       .from("channels")
       .select("client_id")
       .eq("type", "instagram")
+      .eq("external_account_id", receivingAccountId)
       .maybeSingle();
 
     clientId = channel?.client_id;

@@ -11,6 +11,21 @@ const executeSchema = z.object({
   simulate: z.boolean().optional().default(false),
 });
 
+async function resolveClientId(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, owner_id")
+    .eq("id", user.id)
+    .single();
+
+  return profile?.owner_id ?? profile?.id ?? user.id;
+}
+
 export async function POST(request: NextRequest) {
   let body: unknown;
   try {
@@ -34,11 +49,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Serviço indisponível" }, { status: 503 });
   }
 
+  const clientId = await resolveClientId(supabase);
+  if (!clientId) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  }
+
   try {
     const { data: flow, error: flowError } = await supabase
       .from("flows")
       .select("*")
       .eq("id", flowId)
+      .eq("client_id", clientId)
       .single();
 
     if (flowError || !flow) {
@@ -49,6 +70,7 @@ export async function POST(request: NextRequest) {
       .from("contacts")
       .select("*")
       .eq("id", contactId)
+      .eq("client_id", clientId)
       .single();
 
     if (contactError || !contact) {

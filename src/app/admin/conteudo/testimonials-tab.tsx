@@ -19,6 +19,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { toastSaved } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { TESTIMONIALS, type Testimonial } from "./_data";
 
@@ -46,7 +47,7 @@ export function TestimonialsTab() {
     if (!form.name.trim() || !form.quote.trim()) return;
     if (editingId) {
       setTestimonials((prev) => prev.map((t) => (t.id === editingId ? { ...t, ...form } : t)));
-      toast.success("Depoimento atualizado");
+      toastSaved("Depoimento atualizado");
     } else {
       const newTestimonial: Testimonial = { id: `test-${Date.now()}`, ...form };
       setTestimonials((prev) => [newTestimonial, ...prev]);

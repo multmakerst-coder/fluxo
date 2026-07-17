@@ -11,6 +11,21 @@ const updateSchema = z.object({
   edges: z.array(z.record(z.string(), z.unknown())).optional(),
 });
 
+async function resolveClientId(supabase: Awaited<ReturnType<typeof createClient>>) {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, owner_id")
+    .eq("id", user.id)
+    .single();
+
+  return profile?.owner_id ?? profile?.id ?? user.id;
+}
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
@@ -22,7 +37,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: "Serviço indisponível" }, { status: 503 });
   }
 
-  const { data, error } = await supabase.from("flows").select("*").eq("id", id).single();
+  const clientId = await resolveClientId(supabase);
+  if (!clientId) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  }
+
+  const { data, error } = await supabase
+    .from("flows")
+    .select("*")
+    .eq("id", id)
+    .eq("client_id", clientId)
+    .single();
 
   if (error || !data) {
     return NextResponse.json({ error: "Fluxo não encontrado" }, { status: 404 });
@@ -67,11 +92,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: "Serviço indisponível" }, { status: 503 });
   }
 
-  const { data, error } = await supabase.from("flows").update(update).eq("id", id).select("*").single();
+  const clientId = await resolveClientId(supabase);
+  if (!clientId) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  }
+
+  const { data, error } = await supabase
+    .from("flows")
+    .update(update)
+    .eq("id", id)
+    .eq("client_id", clientId)
+    .select("*")
+    .single();
 
   if (error || !data) {
     console.error("Erro ao atualizar fluxo:", error);
-    return NextResponse.json({ error: "Erro ao atualizar fluxo" }, { status: 500 });
+    return NextResponse.json({ error: "Fluxo não encontrado" }, { status: 404 });
   }
 
   return NextResponse.json({ flow: data }, { status: 200 });
@@ -88,11 +124,22 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     return NextResponse.json({ error: "Serviço indisponível" }, { status: 503 });
   }
 
-  const { error } = await supabase.from("flows").delete().eq("id", id);
+  const clientId = await resolveClientId(supabase);
+  if (!clientId) {
+    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
+  }
 
-  if (error) {
+  const { data, error } = await supabase
+    .from("flows")
+    .delete()
+    .eq("id", id)
+    .eq("client_id", clientId)
+    .select("id")
+    .single();
+
+  if (error || !data) {
     console.error("Erro ao eliminar fluxo:", error);
-    return NextResponse.json({ error: "Erro ao eliminar fluxo" }, { status: 500 });
+    return NextResponse.json({ error: "Fluxo não encontrado" }, { status: 404 });
   }
 
   return NextResponse.json({ success: true }, { status: 200 });

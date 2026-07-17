@@ -32,6 +32,10 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString("pt-PT", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+function daysSince(iso: string) {
+  return (Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24);
+}
+
 function initials(name: string) {
   return name
     .split(" ")
@@ -82,8 +86,6 @@ export default function ContactosPage() {
   const [statusFilter, setStatusFilter] = useState("todos");
   const [dateFilter, setDateFilter] = useState("todos");
 
-  const now = Date.now();
-
   const fetchContacts = async () => {
     try {
       const supabase = createClient();
@@ -109,7 +111,7 @@ export default function ContactosPage() {
         `);
       
       if (dbContacts) {
-        const formatted: Contact[] = dbContacts.map((c: any) => ({
+        const formatted: Contact[] = dbContacts.map((c) => ({
           id: c.id,
           name: c.name,
           email: c.email || "",
@@ -117,7 +119,7 @@ export default function ContactosPage() {
           channel: (c.source_channel || "whatsapp") as Channel,
           createdAt: c.created_at,
           lastContactAt: c.last_contact_at || c.created_at,
-          tags: c.contact_tags?.map((ct: any) => ct.tag_id) || [],
+          tags: c.contact_tags?.map((ct) => ct.tag_id) || [],
           status: "ativo",
           customFields: [],
           notes: [],
@@ -133,7 +135,9 @@ export default function ContactosPage() {
   };
 
   useEffect(() => {
-    fetchContacts();
+    (async () => {
+      await fetchContacts();
+    })();
   }, []);
 
   const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -156,7 +160,7 @@ export default function ContactosPage() {
       } else {
         toast.error(result.error || "Erro ao importar ficheiro");
       }
-    } catch (err) {
+    } catch {
       toast.error("Erro na ligação ao servidor");
     } finally {
       setImporting(false);
@@ -173,14 +177,14 @@ export default function ContactosPage() {
       if (tagFilter !== "todas" && !c.tags.includes(tagFilter)) return false;
       if (statusFilter !== "todos" && c.status !== statusFilter) return false;
       if (dateFilter !== "todos") {
-        const days = (now - new Date(c.createdAt).getTime()) / (1000 * 60 * 60 * 24);
+        const days = daysSince(c.createdAt);
         if (dateFilter === "7d" && days > 7) return false;
         if (dateFilter === "30d" && days > 30) return false;
         if (dateFilter === "90d" && days > 90) return false;
       }
       return true;
     });
-  }, [contacts, search, channelFilter, tagFilter, statusFilter, dateFilter, now]);
+  }, [contacts, search, channelFilter, tagFilter, statusFilter, dateFilter]);
 
   const tagById = (id: string) => tags.find((t) => t.id === id);
 
@@ -272,7 +276,14 @@ export default function ContactosPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((c) => {
+            {loading && (
+              <TableRow>
+                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                  A carregar contactos...
+                </TableCell>
+              </TableRow>
+            )}
+            {!loading && filtered.map((c) => {
               const Icon = CHANNEL_ICON[c.channel];
               return (
                 <TableRow key={c.id} className="cursor-default">
@@ -325,7 +336,7 @@ export default function ContactosPage() {
                 </TableRow>
               );
             })}
-            {filtered.length === 0 && (
+            {!loading && filtered.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
                   Nenhum contacto encontrado com estes filtros.

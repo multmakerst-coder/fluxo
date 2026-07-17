@@ -39,12 +39,6 @@ export const MEMBROS_EQUIPA = [
   { id: "u-ricardo", nome: "Ricardo Alves" },
 ];
 
-function h(offsetMinutos: number) {
-  const d = new Date("2026-07-15T16:40:00");
-  d.setMinutes(d.getMinutes() - offsetMinutos);
-  return d.toISOString();
-}
-
 export const CONVERSAS: Conversa[] = [];
 
 export function getConversa(id: string): Conversa | undefined {

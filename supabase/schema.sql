@@ -64,6 +64,15 @@ create table coupons (
   created_at timestamptz not null default now()
 );
 
+-- Definições globais da plataforma (par chave/valor), configuráveis a partir de
+-- /admin/configuracoes. Ex.: { "key": "trial_days", "value": 14 }.
+create table platform_settings (
+  key text primary key,
+  value jsonb not null,
+  updated_at timestamptz not null default now(),
+  updated_by uuid references profiles (id) on delete set null
+);
+
 create table subscriptions (
   id uuid primary key default gen_random_uuid(),
   client_id uuid not null references profiles (id) on delete cascade,
@@ -478,6 +487,7 @@ alter table testimonials enable row level security;
 alter table plans enable row level security;
 alter table coupons enable row level security;
 alter table admin_broadcasts enable row level security;
+alter table platform_settings enable row level security;
 
 create policy "blog_posts_public_read" on blog_posts for select using (published = true or auth_is_admin());
 create policy "blog_posts_admin_write" on blog_posts for all using (auth_is_admin()) with check (auth_is_admin());
@@ -491,6 +501,8 @@ create policy "plans_public_read" on plans for select using (true);
 create policy "plans_admin_write" on plans for all using (auth_is_admin()) with check (auth_is_admin());
 create policy "coupons_admin_only" on coupons for all using (auth_is_admin()) with check (auth_is_admin());
 create policy "admin_broadcasts_admin_only" on admin_broadcasts for all using (auth_is_admin()) with check (auth_is_admin());
+create policy "platform_settings_public_read" on platform_settings for select using (true);
+create policy "platform_settings_admin_write" on platform_settings for all using (auth_is_admin()) with check (auth_is_admin());
 
 -- ---------------------------------------------------------------------------
 -- SEED: planos por omissão
@@ -503,8 +515,23 @@ values
 on conflict (slug) do nothing;
 
 -- ---------------------------------------------------------------------------
+-- SEED: definições globais por omissão
+-- ---------------------------------------------------------------------------
+insert into platform_settings (key, value)
+values
+  ('trial_days', '14'),
+  ('support_email', '"suporte@fluxo.pt"')
+on conflict (key) do nothing;
+
+-- ---------------------------------------------------------------------------
 -- TRIGGER: criar perfil automaticamente após signup
 -- ---------------------------------------------------------------------------
+-- IMPORTANTE: o email abaixo tem de ser mantido em sincronia com
+-- ADMIN_EMAIL em src/lib/admin.ts — é a única conta que recebe `role =
+-- 'admin'` automaticamente no signup. Todas as outras contas (incluindo
+-- quaisquer emails de teste) recebem sempre `role = 'client'`. Para promover
+-- outra conta a admin, atualiza manualmente `profiles.role` na base de
+-- dados — não adicionar mais emails aqui.
 create or replace function handle_new_user()
 returns trigger
 language plpgsql security definer set search_path = public
@@ -515,7 +542,10 @@ begin
     new.id,
     coalesce(new.raw_user_meta_data ->> 'full_name', split_part(new.email, '@', 1)),
     new.email,
-    'client'
+    case
+      when lower(new.email) = 'isildotavarespt@gmail.com' then 'admin'
+      else 'client'
+    end
   );
   return new;
 end;

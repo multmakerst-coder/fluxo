@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { toast } from "sonner";
+import { toastSaved } from "@/lib/toast";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -45,7 +46,7 @@ export default function IntegracoesPage() {
   function handleSave() {
     if (!activeIntegration) return;
     setStatuses((prev) => ({ ...prev, [activeIntegration.id]: "ligado" }));
-    toast.success(`${activeIntegration.name} configurado com sucesso`);
+    toastSaved(`${activeIntegration.name} configurado com sucesso`);
     closeDialog();
   }
 

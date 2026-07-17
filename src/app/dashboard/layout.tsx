@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { DashboardSidebar } from "@/components/dashboard/sidebar";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { createClient } from "@/lib/supabase/client";
+import { isAdminEmail, isAdminRole } from "@/lib/admin";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<{ name: string; email: string; avatarUrl?: string }>({
@@ -13,20 +14,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user: supabaseUser } }) => {
+    supabase.auth.getUser().then(async ({ data: { user: supabaseUser } }) => {
       if (supabaseUser) {
-        const email = supabaseUser.email || "";
-        const isAdmin = [
-          "multmakerst@gmail.com",
-          "isildotavares@gmail.com",
-          "isildo@gmail.com",
-          "isildotavaresst@gmail.com",
-          "isildotavarespt@gmail.com",
-          "admin@fluxo.pt"
-        ].includes(email.toLowerCase());
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", supabaseUser.id)
+          .maybeSingle();
 
-        if (isAdmin) {
-          window.location.href = "/admin";
+        // Salvaguarda no cliente: o middleware já trata este redirecionamento
+        // no servidor; isto é apenas uma rede de segurança adicional.
+        if (isAdminRole(profile?.role) || isAdminEmail(supabaseUser.email)) {
+          window.location.assign("/admin");
           return;
         }
 

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { MessageSquareText } from "lucide-react";
-import { toast } from "sonner";
+import { toastSaved } from "@/lib/toast";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -42,7 +42,7 @@ export function DmEditorDialog() {
   }
 
   function handleGuardar() {
-    toast.success("Configuração de DM automática guardada.");
+    toastSaved("Configuração de DM automática guardada.");
     setOpen(false);
   }
 

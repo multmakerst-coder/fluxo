@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { AdminSidebar } from "@/components/admin/sidebar";
 import { DashboardHeader } from "@/components/dashboard/header";
 import { createClient } from "@/lib/supabase/client";
+import { isAdminEmail, isAdminRole } from "@/lib/admin";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [admin, setAdmin] = useState<{ name: string; email: string; avatarUrl?: string }>({
@@ -13,8 +14,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .maybeSingle();
+
+        // Salvaguarda no cliente: o middleware já protege /admin no servidor;
+        // isto é apenas uma rede de segurança adicional para quem não é admin.
+        if (!isAdminRole(profile?.role) && !isAdminEmail(user.email)) {
+          window.location.assign("/dashboard");
+          return;
+        }
+
         setAdmin({
           name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "Administrador",
           email: user.email || "",
