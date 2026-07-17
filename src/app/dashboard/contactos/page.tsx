@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Search, Download, MessageCircle, Camera, Mail } from "lucide-react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
@@ -9,10 +9,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { CONTACTS, INITIAL_TAGS, type Channel, type Tag } from "./_data";
+import { INITIAL_TAGS, type Channel, type Tag, type Contact } from "./_data";
 import { TagManager } from "./tag-manager";
 import { CreateSegmentDialog } from "./create-segment-dialog";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
+import { toast } from "sonner";
 
 const CHANNEL_ICON: Record<Channel, typeof MessageCircle> = {
   whatsapp: MessageCircle,
@@ -39,7 +41,7 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-function exportCsv(rows: typeof CONTACTS, tags: Tag[]) {
+function exportCsv(rows: Contact[], tags: Tag[]) {
   const tagName = (id: string) => tags.find((t) => t.id === id)?.name ?? id;
   const header = ["Nome", "Email", "Telemóvel", "Canal", "Data de entrada", "Tags", "Último contacto", "Estado"];
   const lines = rows.map((c) =>
@@ -70,23 +72,99 @@ function exportCsv(rows: typeof CONTACTS, tags: Tag[]) {
 
 export default function ContactosPage() {
   const [tags, setTags] = useState<Tag[]>(INITIAL_TAGS);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+
   const [search, setSearch] = useState("");
   const [channelFilter, setChannelFilter] = useState("todos");
   const [tagFilter, setTagFilter] = useState("todas");
   const [statusFilter, setStatusFilter] = useState("todos");
   const [dateFilter, setDateFilter] = useState("todos");
 
-  // Leitura de Date.now() para filtragem por intervalo de datas (7d/30d/90d).
-  // A regra react-hooks/purity assinala qualquer leitura de Date.now() durante o
-  // render (mesmo fora do useMemo, e mesmo via useSyncExternalStore), mas aqui é
-  // inofensivo: os dados (CONTACTS) são estáticos e o recálculo só acontece quando
-  // o utilizador muda um filtro, pelo que uma pequena variação de "now" entre
-  // renders não tem qualquer impacto visível a esta granularidade (dias).
-  // eslint-disable-next-line react-hooks/purity -- ver comentário acima
   const now = Date.now();
 
+  const fetchContacts = async () => {
+    try {
+      const supabase = createClient();
+      
+      const { data: dbTags } = await supabase.from("tags").select("*");
+      if (dbTags && dbTags.length > 0) {
+        setTags(dbTags.map(t => ({ id: t.id, name: t.name, color: t.color })));
+      }
+
+      const { data: dbContacts } = await supabase
+        .from("contacts")
+        .select(`
+          id,
+          name,
+          email,
+          phone,
+          source_channel,
+          created_at,
+          last_contact_at,
+          contact_tags (
+            tag_id
+          )
+        `);
+      
+      if (dbContacts) {
+        const formatted: Contact[] = dbContacts.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          email: c.email || "",
+          phone: c.phone || "",
+          channel: (c.source_channel || "whatsapp") as Channel,
+          createdAt: c.created_at,
+          lastContactAt: c.last_contact_at || c.created_at,
+          tags: c.contact_tags?.map((ct: any) => ct.tag_id) || [],
+          status: "ativo",
+          customFields: [],
+          notes: [],
+          conversation: []
+        }));
+        setContacts(formatted);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchContacts();
+  }, []);
+
+  const handleImportCSV = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const response = await fetch("/api/contacts/import", {
+        method: "POST",
+        body: formData,
+      });
+      const result = await response.json();
+      if (response.ok) {
+        toast.success(`Importados com sucesso ${result.success} contactos!`);
+        fetchContacts();
+      } else {
+        toast.error(result.error || "Erro ao importar ficheiro");
+      }
+    } catch (err) {
+      toast.error("Erro na ligação ao servidor");
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const filtered = useMemo(() => {
-    return CONTACTS.filter((c) => {
+    return contacts.filter((c) => {
       if (search) {
         const q = search.toLowerCase();
         if (!c.name.toLowerCase().includes(q) && !c.email.toLowerCase().includes(q)) return false;
@@ -102,7 +180,7 @@ export default function ContactosPage() {
       }
       return true;
     });
-  }, [search, channelFilter, tagFilter, statusFilter, dateFilter, now]);
+  }, [contacts, search, channelFilter, tagFilter, statusFilter, dateFilter, now]);
 
   const tagById = (id: string) => tags.find((t) => t.id === id);
 
@@ -112,12 +190,20 @@ export default function ContactosPage() {
         <div>
           <h1 className="text-2xl font-semibold">Contactos</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {filtered.length} de {CONTACTS.length} contactos
+            {filtered.length} de {contacts.length} contactos
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <TagManager tags={tags} onChange={setTags} />
-          <CreateSegmentDialog contacts={CONTACTS} tags={tags} />
+          <CreateSegmentDialog contacts={contacts} tags={tags} />
+          <label className={cn(
+            "flex h-9 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-xs font-medium shadow-sm transition-colors hover:bg-accent hover:text-accent-foreground cursor-pointer",
+            importing && "opacity-50 pointer-events-none"
+          )}>
+            <Download className="h-4 w-4 rotate-180" />
+            {importing ? "A importar..." : "Importar CSV"}
+            <input type="file" accept=".csv" className="hidden" onChange={handleImportCSV} />
+          </label>
           <Button variant="outline" onClick={() => exportCsv(filtered, tags)}>
             <Download className="h-4 w-4" /> Exportar CSV
           </Button>

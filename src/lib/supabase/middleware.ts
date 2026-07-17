@@ -47,16 +47,17 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  const email = user?.email || "";
+  const isAdminEmail = [
+    "multmakerst@gmail.com",
+    "isildotavares@gmail.com",
+    "isildo@gmail.com",
+    "isildotavaresst@gmail.com",
+    "admin@fluxo.pt"
+  ].includes(email.toLowerCase());
+
   if (user && isAdminRoute) {
     const role = (user.app_metadata?.role as string | undefined) ?? "client";
-    const email = user.email || "";
-    const isAdminEmail = [
-      "multmakerst@gmail.com",
-      "isildotavares@gmail.com",
-      "isildo@gmail.com",
-      "admin@fluxo.pt"
-    ].includes(email.toLowerCase());
-
     if (role !== "admin" && role !== "super_admin" && !isAdminEmail) {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard";
@@ -64,9 +65,15 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
+  if (user && isClientRoute && isAdminEmail) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/admin";
+    return NextResponse.redirect(url);
+  }
+
   if (user && isAuthPage) {
     const url = request.nextUrl.clone();
-    url.pathname = "/dashboard";
+    url.pathname = isAdminEmail ? "/admin" : "/dashboard";
     url.search = "";
     return NextResponse.redirect(url);
   }
