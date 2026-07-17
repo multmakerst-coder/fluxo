@@ -21,6 +21,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           "isildotavares@gmail.com",
           "isildo@gmail.com",
           "isildotavaresst@gmail.com",
+          "isildotavarespt@gmail.com",
+          "nharlock980@gmail.com",
           "admin@fluxo.pt"
         ].includes(email.toLowerCase());
 
