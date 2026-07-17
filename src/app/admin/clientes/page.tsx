@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Search, MessageCircle, Camera, Mail } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -8,9 +8,10 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { ADMIN_CLIENTS, STATUS_LABELS, PLAN_LABELS, type Channel, type ClientStatus } from "./_data";
+import { STATUS_LABELS, PLAN_LABELS, type Channel, type ClientStatus, type AdminClient } from "./_data";
 import type { PlanSlug } from "@/lib/plans";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 
 const CHANNEL_ICON: Record<Channel, typeof MessageCircle> = {
   whatsapp: MessageCircle,
@@ -45,13 +46,47 @@ function initials(name: string) {
 }
 
 export default function AdminClientesPage() {
+  const [clients, setClients] = useState<AdminClient[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [planFilter, setPlanFilter] = useState("todos");
   const [statusFilter, setStatusFilter] = useState("todos");
   const [channelFilter, setChannelFilter] = useState("todos");
 
+  useEffect(() => {
+    const supabase = createClient();
+    supabase
+      .from("profiles")
+      .select("*")
+      .eq("role", "client")
+      .order("created_at", { ascending: false })
+      .then(({ data, error }) => {
+        if (data) {
+          const mapped = data.map((profile) => ({
+            id: profile.id,
+            name: profile.full_name || "Cliente Sem Nome",
+            contactName: profile.full_name || "Cliente Sem Nome",
+            email: profile.email || "",
+            plan: "gratuito" as PlanSlug,
+            status: "ativo" as ClientStatus,
+            registeredAt: profile.created_at,
+            channels: [] as Channel[],
+            contactsCount: 0,
+            messagesSent: 0,
+            messagesReceived: 0,
+            activeFlows: 0,
+            lastActivity: profile.created_at,
+            mrr: 0,
+            planHistory: [],
+          }));
+          setClients(mapped);
+        }
+        setLoading(false);
+      });
+  }, []);
+
   const filtered = useMemo(() => {
-    return ADMIN_CLIENTS.filter((c) => {
+    return clients.filter((c) => {
       if (search) {
         const q = search.toLowerCase();
         if (!c.name.toLowerCase().includes(q) && !c.email.toLowerCase().includes(q)) return false;
@@ -61,14 +96,14 @@ export default function AdminClientesPage() {
       if (channelFilter !== "todos" && !c.channels.includes(channelFilter as Channel)) return false;
       return true;
     });
-  }, [search, planFilter, statusFilter, channelFilter]);
+  }, [clients, search, planFilter, statusFilter, channelFilter]);
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold">Clientes</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {filtered.length} de {ADMIN_CLIENTS.length} clientes registados na plataforma
+          {filtered.length} de {clients.length} clientes registados na plataforma
         </p>
       </div>
 
@@ -125,48 +160,56 @@ export default function AdminClientesPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((c) => (
-              <TableRow key={c.id}>
-                <TableCell>
-                  <Link href={`/admin/clientes/${c.id}`} className="flex items-center gap-2.5 hover:underline">
-                    <Avatar size="sm">
-                      <AvatarFallback className="bg-primary/10 text-primary">{initials(c.name)}</AvatarFallback>
-                    </Avatar>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{c.name}</p>
-                      <p className="truncate text-xs text-muted-foreground">{c.email}</p>
-                    </div>
-                  </Link>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className={cn("border-0", PLAN_BADGE[c.plan])}>
-                    {PLAN_LABELS[c.plan]}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="outline" className={cn("border-0", STATUS_BADGE[c.status])}>
-                    {STATUS_LABELS[c.status]}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-sm text-muted-foreground">{formatDate(c.registeredAt)}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1.5">
-                    {c.channels.map((channel) => {
-                      const Icon = CHANNEL_ICON[channel];
-                      return (
-                        <span key={channel} className="flex h-6 w-6 items-center justify-center rounded-md bg-muted text-foreground">
-                          <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
-                        </span>
-                      );
-                    })}
-                  </div>
-                </TableCell>
-                <TableCell className="text-sm font-medium">
-                  {new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(c.mrr)}
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                  A carregar clientes...
                 </TableCell>
               </TableRow>
-            ))}
-            {filtered.length === 0 && (
+            ) : (
+              filtered.map((c) => (
+                <TableRow key={c.id}>
+                  <TableCell>
+                    <Link href={`/admin/clientes/${c.id}`} className="flex items-center gap-2.5 hover:underline">
+                      <Avatar size="sm">
+                        <AvatarFallback className="bg-primary/10 text-primary">{initials(c.name)}</AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{c.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">{c.email}</p>
+                      </div>
+                    </Link>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={cn("border-0", PLAN_BADGE[c.plan])}>
+                      {PLAN_LABELS[c.plan]}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={cn("border-0", STATUS_BADGE[c.status])}>
+                      {STATUS_LABELS[c.status]}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">{formatDate(c.registeredAt)}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      {c.channels.map((channel) => {
+                        const Icon = CHANNEL_ICON[channel];
+                        return (
+                          <span key={channel} className="flex h-6 w-6 items-center justify-center rounded-md bg-muted text-foreground">
+                            <Icon className="h-3.5 w-3.5" strokeWidth={1.75} />
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </TableCell>
+                  <TableCell className="text-sm font-medium">
+                    {new Intl.NumberFormat("pt-PT", { style: "currency", currency: "EUR" }).format(c.mrr)}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+            {!loading && filtered.length === 0 && (
               <TableRow>
                 <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
                   Nenhum cliente encontrado com estes filtros.

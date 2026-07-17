@@ -143,47 +143,7 @@ function buildConversation(id: string, channel: Channel, count: number): Convers
   return msgs;
 }
 
-export const CONTACTS: Contact[] = NAMES.map((name, i) => {
-  const id = `c-${pad(i + 1)}`;
-  const channel = CHANNELS[i % CHANNELS.length];
-  const createdDaysAgo = 3 + i * 5;
-  const lastContactDaysAgo = Math.max(0, (i % 7));
-  const tags: string[] = [];
-  if (i % 3 === 0) tags.push("lead-quente");
-  if (i % 4 === 0) tags.push("cliente");
-  if (i % 7 === 0) tags.push("vip");
-  if (i % 5 === 0) tags.push("novo");
-  if (i % 6 === 0) tags.push("suporte");
-  if (tags.length === 0) tags.push("newsletter");
-
-  return {
-    id,
-    name,
-    email: `${slug(name)}@exemplo.pt`,
-    phone: `+351 9${(10000000 + i * 7919) % 90000000}`.slice(0, 13),
-    channel,
-    createdAt: dateOffset(createdDaysAgo),
-    lastContactAt: dateOffset(lastContactDaysAgo),
-    tags,
-    status: i % 9 === 0 ? "inativo" : "ativo",
-    customFields:
-      i % 4 === 0
-        ? [{ id: `${id}-cf-1`, label: "Valor de compra", type: "numero", value: String(30 + i * 12) }]
-        : [],
-    notes:
-      i % 5 === 0
-        ? [
-            {
-              id: `${id}-note-1`,
-              content: "Contacto interessado no plano Pro, fazer follow-up na próxima semana.",
-              author: "Marta Silva",
-              createdAt: dateOffset(lastContactDaysAgo + 1),
-            },
-          ]
-        : [],
-    conversation: buildConversation(id, channel, 3 + (i % 4)),
-  };
-});
+export const CONTACTS: Contact[] = [];
 
 export function getContactById(id: string) {
   return CONTACTS.find((c) => c.id === id);

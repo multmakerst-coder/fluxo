@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { UserPlus, Trash2, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
 
 type Role = "admin" | "agente" | "leitura";
 
@@ -39,12 +40,7 @@ const ROLE_LABEL: Record<Role, string> = {
   leitura: "Apenas leitura",
 };
 
-const INITIAL_MEMBERS: Member[] = [
-  { id: "m1", name: "Marta Silva", email: "marta@negocio.pt", role: "admin", status: "ativo" },
-  { id: "m2", name: "Carlos Mendes", email: "carlos@negocio.pt", role: "agente", status: "ativo" },
-  { id: "m3", name: "Sara Nogueira", email: "sara@negocio.pt", role: "leitura", status: "ativo" },
-  { id: "m4", name: "Rui Barros", email: "rui@negocio.pt", role: "agente", status: "convite pendente" },
-];
+const INITIAL_MEMBERS: Member[] = [];
 
 const PLAN_ALLOWS_TEAM = true;
 
@@ -57,6 +53,24 @@ export default function EquipaPage() {
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<Role>("agente");
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user: supabaseUser } }) => {
+      if (supabaseUser) {
+        const name = supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || supabaseUser.email?.split("@")[0] || "Utilizador";
+        setMembers([
+          {
+            id: supabaseUser.id,
+            name,
+            email: supabaseUser.email || "",
+            role: "admin",
+            status: "ativo"
+          }
+        ]);
+      }
+    });
+  }, []);
 
   function inviteMember() {
     if (!inviteEmail.trim()) return;
