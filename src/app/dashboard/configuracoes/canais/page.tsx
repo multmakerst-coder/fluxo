@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { toastSaved } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { WhatsAppEmbeddedSignupButton, type WhatsAppChannelRecord } from "@/components/whatsapp-embedded-signup-button";
 
 type Status = "ligado" | "desligado";
 type ChannelType = "whatsapp" | "instagram" | "email";
@@ -183,6 +184,10 @@ export default function CanaisPage() {
         connected={whatsappConnected}
         channel={whatsapp}
         onConnect={(fields) => connectChannel("whatsapp", fields)}
+        onConnected={(next) => {
+          setChannels((prev) => ({ ...prev, whatsapp: next }));
+          toastSaved("WhatsApp ligado");
+        }}
         onDisconnect={() => disconnectChannel("whatsapp")}
       />
       <InstagramCard
@@ -205,17 +210,20 @@ function WhatsAppCard({
   connected,
   channel,
   onConnect,
+  onConnected,
   onDisconnect,
 }: {
   connected: boolean;
   channel: ChannelRow | null;
   onConnect: (fields: Partial<ChannelRow>) => Promise<void>;
+  onConnected: (channel: WhatsAppChannelRecord) => void;
   onDisconnect: () => void;
 }) {
   const [phone, setPhone] = useState(channel?.phone_number ?? "");
   const [phoneNumberId, setPhoneNumberId] = useState(channel?.external_account_id ?? "");
   const [token, setToken] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [manual, setManual] = useState(false);
 
   async function handleConnect() {
     if (!phone.trim() || !phoneNumberId.trim() || !token.trim()) return;
@@ -267,35 +275,51 @@ function WhatsAppCard({
         ) : (
           <>
             <p className="text-sm text-muted-foreground">
-              Obtém estes dados no teu{" "}
-              <a
-                href="https://business.facebook.com/wa/manage/phone-numbers/"
-                target="_blank"
-                rel="noreferrer"
-                className="text-primary underline-offset-4 hover:underline"
-              >
-                Meta Business Suite → WhatsApp Cloud API
-              </a>
-              .
+              Liga a tua conta com um clique — autorizas no Facebook e escolhes o número de WhatsApp Business, sem
+              precisares de ir buscar nenhum ID ou token.
             </p>
-            <div className="grid gap-3 sm:max-w-sm">
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="wa-phone">Número de telefone</Label>
-                <Input id="wa-phone" placeholder="+351 912 345 678" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="wa-phone-id">Phone Number ID</Label>
-                <Input id="wa-phone-id" placeholder="Ex: 1185997837938923" value={phoneNumberId} onChange={(e) => setPhoneNumberId(e.target.value)} />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor="wa-token">Token de acesso permanente</Label>
-                <Input id="wa-token" type="password" placeholder="EAAxxxxxxxxxxxxx" value={token} onChange={(e) => setToken(e.target.value)} />
-              </div>
-            </div>
-            <Button onClick={handleConnect} disabled={submitting || !phone.trim() || !phoneNumberId.trim() || !token.trim()} className="w-fit">
-              {submitting && <LoaderCircle className="h-4 w-4 animate-spin" />}
-              Ligar WhatsApp
-            </Button>
+            <WhatsAppEmbeddedSignupButton onConnected={onConnected} />
+            <button
+              type="button"
+              onClick={() => setManual((m) => !m)}
+              className="w-fit text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              {manual ? "Ocultar ligação manual" : "Prefiro inserir os dados manualmente"}
+            </button>
+            {manual && (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Obtém estes dados no teu{" "}
+                  <a
+                    href="https://business.facebook.com/wa/manage/phone-numbers/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline-offset-4 hover:underline"
+                  >
+                    Meta Business Suite → WhatsApp Cloud API
+                  </a>
+                  .
+                </p>
+                <div className="grid gap-3 sm:max-w-sm">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="wa-phone">Número de telefone</Label>
+                    <Input id="wa-phone" placeholder="+351 912 345 678" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="wa-phone-id">Phone Number ID</Label>
+                    <Input id="wa-phone-id" placeholder="Ex: 1185997837938923" value={phoneNumberId} onChange={(e) => setPhoneNumberId(e.target.value)} />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="wa-token">Token de acesso permanente</Label>
+                    <Input id="wa-token" type="password" placeholder="EAAxxxxxxxxxxxxx" value={token} onChange={(e) => setToken(e.target.value)} />
+                  </div>
+                </div>
+                <Button onClick={handleConnect} disabled={submitting || !phone.trim() || !phoneNumberId.trim() || !token.trim()} className="w-fit">
+                  {submitting && <LoaderCircle className="h-4 w-4 animate-spin" />}
+                  Ligar WhatsApp
+                </Button>
+              </>
+            )}
           </>
         )}
       </CardContent>
