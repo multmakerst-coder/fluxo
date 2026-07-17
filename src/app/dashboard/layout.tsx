@@ -15,6 +15,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user: supabaseUser } }) => {
       if (supabaseUser) {
+        const email = supabaseUser.email || "";
+        const isAdmin = [
+          "multmakerst@gmail.com",
+          "isildotavares@gmail.com",
+          "isildo@gmail.com",
+          "isildotavaresst@gmail.com",
+          "admin@fluxo.pt"
+        ].includes(email.toLowerCase());
+
+        if (isAdmin) {
+          window.location.href = "/admin";
+          return;
+        }
+
         setUser({
           name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || supabaseUser.email?.split("@")[0] || "Utilizador",
           email: supabaseUser.email || "",
